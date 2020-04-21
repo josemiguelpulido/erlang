@@ -1,5 +1,5 @@
 -module(crypt).
--export([gcd/2, erasthotenes/1, rsa_keys/0, test_encrypt/1, start_alice/0, start_bob/0, init_handshake/2, handshake/1]).
+-export([gcd/2, erasthotenes/1, rsa_keys/0, test_encrypt/1, start_alice/2, start_bob/0, init_handshake/3, handshake/1]).
 
 gcd(A,B) when A rem B == 0 ->
     B;
@@ -31,22 +31,18 @@ rsa_keys() ->
     P = erasthotenes(100),
 
     % select 2 primes P1 and P2 at random
-    O = [X||{_,X} <- lists:sort([ {rand:uniform(), N} || N <- P])],
+    [P1|[P2|RestP]] = [X||{_,X} <- lists:sort([ {rand:uniform(), N} || N <- P])],
 
     %E = 3,
     %P1 =23,
     %P2 = 11,
 
-    [P1|Rest]  = O,
-    [P2|Rest2] = Rest,
-
     % compute N and Phi(N)
     N = P1 * P2,
     Phi = (P1-1)*(P2-1),
-    io:format("N: ~w, P1:~w P2:~w, Phi: ~w~n",[N,P1, P2, Phi]),
 
     % find E relatively prime to Phi(N) (to ensure a D exists)
-    [E|_] = [ X || X <- Rest2, gcd(X, Phi) == 1],
+    [E|_] = [ X || X <- RestP, gcd(X, Phi) == 1],
 
     % compute D as the inverse of E, mod Phi(N)    
     % (naive approach. More efficient via Extended Euclid)
@@ -54,6 +50,7 @@ rsa_keys() ->
     [D|_] = [X || {X,R} <- [{K, K*E rem Phi} || K <- L], R == 1],
 
     % rsa keys
+    io:format("E: ~w, N:~w, D: ~w~n",[E,N,D]),
     [E, N, D].
 
 
@@ -88,14 +85,14 @@ test_encrypt(Text) ->
     io:format("Plaintext: ~p~n", [PText]).
 
     
-init_handshake([E,N,D], Bob_Node) ->
+init_handshake([E,N,D], Bob_Node, Msg) ->
 
 
     {bob, Bob_Node} ! {keys, [E,N], self()},
 
     receive 
         {keys, [Er, Nr], Pid} ->
-            CText = encrypt("hello", Er),
+            CText = encrypt(Msg, Er),
             io:format("message sent: ~p~n",[CText]),
             {bob, Bob_Node} ! {encrypted, CText, self()}
             %comm([E,N,D],[Er, Nr])
@@ -118,9 +115,9 @@ comm([E,N,D], [Er, Nr]) ->
             io:format("message received: ~p~n",[PText])
     end.
     
-start_alice() ->
+start_alice(Msg, Node) ->
     [E,N,D] = rsa_keys(),
-    spawn(crypt, init_handshake, [[E,N,D],node2@jm]).
+    spawn(crypt, init_handshake, [[E,N,D],Node, Msg]).
 
 start_bob() ->
     [E,N,D] = rsa_keys(),
