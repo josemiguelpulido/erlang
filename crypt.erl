@@ -1,5 +1,9 @@
 -module(crypt).
--export([gcd/2, erasthotenes/1, rsa_keys/0, test_encrypt/1, start_alice/2, start_bob/0, init_handshake/3, handshake/1]).
+-export([gcd/2, erasthotenes/1, rsa_keys/0]).
+
+-export([test_encrypt/1]).
+
+-export([start_alice/2, start_bob/0, init_handshake/3, handshake/1]).
 
 gcd(A,B) when A rem B == 0 ->
     B;
@@ -10,13 +14,14 @@ gcd(A, B) ->
 
 
 erasthotenes(N) ->
-    erasthotenes(N, 3, lists:seq(2,N)).
+    S = round(math:sqrt(N)),
+    erasthotenes(S, 2, lists:seq(1,S)).
     
 erasthotenes(N, K, L) when K < N ->
-    P = [if X rem K == 0 -> if X > K -> 0; true -> X end; true -> X end || X <- L],
+    P = [if X rem K == 0, X > K -> 0; true -> X end || X <- L],
     erasthotenes(N, K+1, P);
 erasthotenes(N, K, L) ->
-    [X || X <- L, X > 0].
+    [X || X <- L, X > 1].
 
                                      
 rsa_keys() ->
@@ -28,10 +33,11 @@ rsa_keys() ->
     % (E,N) is public key, (D,N) is private key
 
     % get a list of primes
-    P = erasthotenes(100),
+    P = erasthotenes(10000),
+    io:format("Erastothenes: ~p~n",[P]),
 
     % select 2 primes P1 and P2 at random
-    [P1|[P2|RestP]] = [X||{_,X} <- lists:sort([ {rand:uniform(), N} || N <- P])],
+    [P1,P2|RestP] = [X||{_,X} <- lists:sort([ {rand:uniform(), N} || N <- P])],
 
     %E = 3,
     %P1 =23,
@@ -47,8 +53,8 @@ rsa_keys() ->
     % compute D as the inverse of E, mod Phi(N)    
     % (naive approach. More efficient via Extended Euclid)
     L = lists:seq(1,Phi-1),
-    [D|_] = [X || {X,R} <- [{K, K*E rem Phi} || K <- L], R == 1],
-
+    [D|_] = [X || {X,R} <- [{K, K*E rem Phi} || K <- L], 
+                  R == 1, X /= E],
     % rsa keys
     io:format("E: ~w, N:~w, D: ~w~n",[E,N,D]),
     [E, N, D].
@@ -121,7 +127,10 @@ start_alice(Msg, Node) ->
 
 start_bob() ->
     [E,N,D] = rsa_keys(),
-    register(bob, spawn(crypt, handshake, [[E,N,D]])).
+    %register(bob, spawn(crypt, handshake, [[E,N,D]])).
+    register(bob, spawn(fun() ->
+                                handshake([E,N,D])
+                        end)).
 
     
     
