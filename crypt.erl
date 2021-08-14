@@ -26,7 +26,7 @@ erasthotenes(N, K, L) ->
                                      
 rsa_keys() ->
 
-    % RSA algorithm uses Euler's a^Phi(N) = 1 mod N,
+    % RSA algorithm using Euler's a^Phi(N) = 1 mod N,
     % as a^Phi(N)+1 = a mod N.
     % Constructs E*D = k*Phi(N) + 1,
     % equivalent to D being inverse of E mod Phi(N).
